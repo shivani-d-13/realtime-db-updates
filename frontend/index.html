@@ -336,9 +336,6 @@ const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'
     }
 
     // ---- Supabase Realtime Subscription ----
-    // This is the core of the assignment.
-    // We subscribe to ALL changes on the orders table.
-    // Supabase pushes events over WebSocket — no polling.
     client
       .channel('orders-channel')
       .on(
