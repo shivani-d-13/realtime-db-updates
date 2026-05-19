@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Realtime Order Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 30px;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #444;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status-dot.connected { background: #22c55e; }
+
+    /* Form */
+    .form-section {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 30px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input, select {
+      background: #0f1117;
+      border: 1px solid #2a2d3a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+      outline: none;
+      width: 180px;
+    }
+
+    input:focus, select:focus {
+      border-color: #6366f1;
+    }
+
+    button {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-add {
+      background: #6366f1;
+      color: white;
+    }
+    .btn-add:hover { background: #4f46e5; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid #2a2d3a;
+      color: #888;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1a1d27;
+      transition: background 0.3s;
+    }
+
+    tr.flash-green td { background: #14532d55; }
+    tr.flash-red td   { background: #7f1d1d55; }
+    tr.flash-blue td  { background: #1e3a5f55; }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+    .badge.pending   { background: #78350f44; color: #fbbf24; }
+    .badge.shipped   { background: #1e3a5f44; color: #60a5fa; }
+    .badge.delivered { background: #14532d44; color: #4ade80; }
+
+    .action-btns { display: flex; gap: 8px; }
+
+    .btn-status {
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      color: #aaa;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      border-radius: 5px;
+    }
+    .btn-status:hover { border-color: #6366f1; color: #fff; }
+
+    .btn-delete {
+      background: transparent;
+      border: 1px solid #2a2d3a;
+      color: #f87171;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      border-radius: 5px;
+    }
+    .btn-delete:hover { background: #7f1d1d33; }
+
+    /* Event log */
+    .log-section {
+      margin-top: 30px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .log-title {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    .log-entry {
+      font-size: 0.8rem;
+      padding: 4px 0;
+      border-bottom: 1px solid #2a2d3a22;
+      color: #aaa;
+    }
+    .log-entry span { font-weight: 600; }
+    .log-entry.insert span { color: #4ade80; }
+    .log-entry.update span { color: #60a5fa; }
+    .log-entry.delete span { color: #f87171; }
+
+    #empty-state {
+      color: #555;
+      font-size: 0.85rem;
+      padding: 20px 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>⚡ Realtime Order Tracker</h1>
+  <p class="subtitle">
+    <span class="status-dot" id="dot"></span>
+    <span id="conn-status">Connecting to Realtime...</span>
+  </p>
+
+  <!-- Add Order Form -->
+  <div class="form-section">
+    <div class="form-group">
+      <label>Customer Name</label>
+      <input type="text" id="customer" placeholder="e.g. Rahul Shah" />
+    </div>
+    <div class="form-group">
+      <label>Product Name</label>
+      <input type="text" id="product" placeholder="e.g. Laptop" />
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="status">
+        <option value="pending">Pending</option>
+        <option value="shipped">Shipped</option>
+        <option value="delivered">Delivered</option>
+      </select>
+    </div>
+    <button class="btn-add" onclick="addOrder()">+ Add Order</button>
+  </div>
+
+  <!-- Orders Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Customer</th>
+        <th>Product</th>
+        <th>Status</th>
+        <th>Updated At</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="orders-body">
+      <tr><td colspan="6" id="empty-state">Loading orders...</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Event Log -->
+  <div class="log-section">
+    <div class="log-title">Live Event Log</div>
+    <div id="event-log"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://prgmhqqlwhqnbqsnqtkf.supabase.co'
+    const SUPABASE_ANON_KEY = 'sb_publishable_MBhwl6G2-PjamLJrDCumPw_EfKyXTP2'
+    const API = 'http://127.0.0.1:8000'
+
+    const { createClient } = supabase
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    let orders = []
+
+    // ---- Load existing orders on page load ----
+    async function loadOrders() {
+      const res = await fetch(`${API}/orders`)
+      orders = await res.json()
+      renderTable()
+    }
+
+    // ---- Render the full table from orders array ----
+    function renderTable() {
+      const tbody = document.getElementById('orders-body')
+      if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" id="empty-state">No orders yet. Add one above.</td></tr>'
+        return
+      }
+      tbody.innerHTML = orders.map(o => `
+        <tr id="row-${o.id}">
+          <td>#${o.id}</td>
+          <td>${o.customer_name}</td>
+          <td>${o.product_name}</td>
+          <td><span class="badge ${o.status}">${o.status}</span></td>
+          <td>${new Date(o.updated_at).toLocaleString()}</td>
+          <td>
+            <div class="action-btns">
+              <button class="btn-status" onclick="cycleStatus(${o.id}, '${o.status}', '${o.customer_name}', '${o.product_name}')">
+                Next Status
+              </button>
+              <button class="btn-delete" onclick="deleteOrder(${o.id})">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('')
+    }
+
+    // ---- Flash a row with a color briefly ----
+    function flashRow(id, type) {
+      const row = document.getElementById(`row-${id}`)
+      if (!row) return
+      const cls = type === 'INSERT' ? 'flash-green' : type === 'UPDATE' ? 'flash-blue' : 'flash-red'
+      row.classList.add(cls)
+      setTimeout(() => row.classList.remove(cls), 1200)
+    }
+
+    // ---- Log events at the bottom ----
+    function logEvent(type, order) {
+      const log = document.getElementById('event-log')
+      const time = new Date().toLocaleTimeString()
+      const entry = document.createElement('div')
+      entry.className = `log-entry ${type.toLowerCase()}`
+      entry.innerHTML = `[${time}] <span>${type}</span> — Order #${order.id} · ${order.customer_name} · ${order.product_name} · ${order.status}`
+      log.prepend(entry)
+    }
+
+    // ---- Add a new order ----
+    async function addOrder() {
+      const customer_name = document.getElementById('customer').value.trim()
+      const product_name = document.getElementById('product').value.trim()
+      const status = document.getElementById('status').value
+      if (!customer_name || !product_name) return alert('Please fill in all fields')
+
+      await fetch(`${API}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_name, product_name, status })
+      })
+
+      document.getElementById('customer').value = ''
+      document.getElementById('product').value = ''
+    }
+
+    // ---- Cycle order status: pending → shipped → delivered ----
+    async function cycleStatus(id, currentStatus, customer_name, product_name) {
+      const next = { pending: 'shipped', shipped: 'delivered', delivered: 'pending' }
+      await fetch(`${API}/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_name, product_name, status: next[currentStatus] })
+      })
+    }
+
+    // ---- Delete an order ----
+    async function deleteOrder(id) {
+      await fetch(`${API}/orders/${id}`, { method: 'DELETE' })
+    }
+
+    // ---- Supabase Realtime Subscription ----
+    // This is the core of the assignment.
+    // We subscribe to ALL changes on the orders table.
+    // Supabase pushes events over WebSocket — no polling.
+    client
+      .channel('orders-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload
+
+          if (eventType === 'INSERT') {
+            orders.push(newRow)
+            renderTable()
+            flashRow(newRow.id, 'INSERT')
+            logEvent('INSERT', newRow)
+          }
+
+          if (eventType === 'UPDATE') {
+            orders = orders.map(o => o.id === newRow.id ? newRow : o)
+            renderTable()
+            flashRow(newRow.id, 'UPDATE')
+            logEvent('UPDATE', newRow)
+          }
+
+          if (eventType === 'DELETE') {
+            logEvent('DELETE', oldRow)
+            orders = orders.filter(o => o.id !== oldRow.id)
+            renderTable()
+          }
+        }
+      )
+      .subscribe((status) => {
+        const dot = document.getElementById('dot')
+        const label = document.getElementById('conn-status')
+        if (status === 'SUBSCRIBED') {
+          dot.classList.add('connected')
+          label.textContent = 'Connected to Realtime'
+        } else {
+          dot.classList.remove('connected')
+          label.textContent = `Realtime status: ${status}`
+        }
+      })
+
+    loadOrders()
+  </script>
+</body>
+</html>
