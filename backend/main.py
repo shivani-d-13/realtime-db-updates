@@ -17,7 +17,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 app = FastAPI()
 
-# Allow frontend (browser) to talk to this backend
+# Allow frontend to communicate with backend service
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -69,8 +69,3 @@ def delete_order(order_id: int):
     """Delete an order from the database."""
     response = supabase.table("orders").delete().eq("id", order_id).execute()
     return {"message": f"Order {order_id} deleted"}
-
-@app.get("/test")
-def test_db():
-    response = supabase.table("orders").select("*").execute()
-    return response

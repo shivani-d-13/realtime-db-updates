@@ -73,6 +73,7 @@
       font-size: 0.9rem;
       outline: none;
       width: 180px;
+      height: 38px;
     }
 
     input:focus, select:focus {
@@ -190,7 +191,7 @@
 </head>
 <body>
 
-  <h1>⚡ Realtime Order Tracker</h1>
+  <h1>Realtime Order Tracker</h1>
   <p class="subtitle">
     <span class="status-dot" id="dot"></span>
     <span id="conn-status">Connecting to Realtime...</span>
@@ -241,8 +242,8 @@
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://prgmhqqlwhqnbqsnqtkf.supabase.co'
-    const SUPABASE_ANON_KEY = 'sb_publishable_MBhwl6G2-PjamLJrDCumPw_EfKyXTP2'
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL'
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'
     const API = 'http://127.0.0.1:8000'
 
     const { createClient } = supabase
@@ -270,7 +271,7 @@
           <td>${o.customer_name}</td>
           <td>${o.product_name}</td>
           <td><span class="badge ${o.status}">${o.status}</span></td>
-          <td>${new Date(o.updated_at).toLocaleString()}</td>
+          <td>${new Date(o.updated_at + 'Z').toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' })}</td>
           <td>
             <div class="action-btns">
               <button class="btn-status" onclick="cycleStatus(${o.id}, '${o.status}', '${o.customer_name}', '${o.product_name}')">
@@ -361,9 +362,18 @@
           }
 
           if (eventType === 'DELETE') {
-            logEvent('DELETE', oldRow)
-            orders = orders.filter(o => o.id !== oldRow.id)
-            renderTable()
+              logEvent('DELETE', oldRow)
+              const row = document.getElementById(`row-${oldRow.id}`)
+              if (row) {
+                  row.classList.add('flash-red')
+                  setTimeout(() => {
+                      orders = orders.filter(o => o.id !== oldRow.id)
+                      renderTable()
+                  }, 800)
+              } else {
+                  orders = orders.filter(o => o.id !== oldRow.id)
+                  renderTable()
+              }
           }
         }
       )
